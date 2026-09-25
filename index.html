@@ -242,6 +242,44 @@ input[type=color].input{padding:4px;height:44px;width:64px}
   .fab{bottom:32px}
 }
 /* ---------- v2.3: desktop layout (large screens) ---------- */
+/* ============================================================
+   DEN v2.5: sheets mode + first-run setup
+   ============================================================ */
+.segview{display:inline-flex;background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.segview button{border:0;background:transparent;padding:8px 18px;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;font-family:inherit}
+.segview button.on{background:var(--primary);color:var(--primary-ink)}
+.sheetwrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+table.sheetgrid{border-collapse:collapse;width:100%;min-width:780px;font-size:14px}
+.sheetgrid thead th{background:var(--primary);color:var(--primary-ink);text-align:left;padding:9px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.6px;white-space:nowrap}
+.sheetgrid tbody td{border-top:1px solid var(--line);padding:0;vertical-align:middle}
+.sheetgrid tbody tr:hover td{background:var(--surface-2)}
+.sheetgrid tbody tr.srow-new td{background:var(--surface-2)}
+.snum{width:36px;text-align:center;color:var(--muted);font-size:12px;padding:9px 4px !important}
+input.scell,select.scell{width:100%;border:0;background:transparent;padding:10px;font-size:14px;color:var(--ink);font-family:inherit;border-radius:0}
+input.scell:focus,select.scell:focus{outline:2px solid var(--primary);outline-offset:-2px}
+.scell.stitle{min-width:200px}
+.sstatus{min-width:150px}
+.spri{min-width:110px}
+.sdate{min-width:132px}
+.spct{display:flex;align-items:center;gap:8px;padding:0 10px;min-width:112px}
+.spctbarwrap{flex:1;height:6px;border-radius:4px;background:var(--line);overflow:hidden}
+.spctbar{height:100%;background:var(--primary);border-radius:4px;transition:width .3s}
+.spct span{font-size:12px;font-weight:700;min-width:38px;text-align:right}
+.sdel{border:0;background:transparent;color:var(--muted);font-size:19px;line-height:1;cursor:pointer;padding:8px 10px;border-radius:8px}
+.sdel:hover{color:var(--danger)}
+.sopen{border:0;background:transparent;color:var(--muted);cursor:pointer;padding:8px 6px;border-radius:8px;font-size:14px}
+.sopen:hover{color:var(--primary)}
+.sheethint{font-size:12px;color:var(--muted);margin:8px 2px}
+.setupwrap{max-width:600px;margin:0 auto;padding:30px 16px 60px}
+.setupcard{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:12px}
+.setupcard h3{margin:0 0 4px;font-size:15px}
+.setupcard p.sub{margin:0 0 14px;font-size:13px;color:var(--muted)}
+.pickgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pickgrid.trio{grid-template-columns:1fr 1fr 1fr}
+.pick{border:2px solid var(--line);border-radius:12px;padding:14px;cursor:pointer;background:var(--surface);text-align:left;font-family:inherit;color:var(--ink);font-size:14px}
+.pick .t{font-weight:800;font-size:14px;margin-bottom:4px}
+.pick .d{font-size:12px;color:var(--muted)}
+.pick.on{border-color:var(--primary);background:var(--surface-2)}
 @media (min-width:1024px){
   #appwrap{max-width:none;margin:0}
   #appwrap.in #app{margin-left:236px;max-width:none}
@@ -486,6 +524,7 @@ async function doAuth(mode){
       }
       if(pIns.error && !/duplicate/i.test(pIns.error.message)){ console.error(pIns.error); toast('Account created, but profile setup hit a snag: '+pIns.error.message, true); }
     }
+    if(mode==='signup') S.showSetup = true;
     await boot();
   }catch(e){ console.error(e); authError('Network problem — check your connection and try again.'); $('authGo').disabled=false; }
 }
@@ -538,6 +577,7 @@ async function boot(){
   renderLoading();
   await loadAll();
   renderTabs(); setTab('today');
+  if(S.showSetup){ S.showSetup=false; if(!setupDone()){ showSetup(); return; } }
   await rollForwardOverdue();
   bridgeSyncAll();
   checkDueReminders();
@@ -608,7 +648,7 @@ function render(){
   let header = '', body = '';
   if(v.view==='today'){ header=todayHead(); body=vToday(); fabFor('today'); }
   else if(v.view==='projects'){ header=barHead('Projects', true, '<button class="iconbtn plain" data-act="new-project" aria-label="New project">'+I.edit+'</button>'); body=vProjects(); fabFor('projects'); }
-  else if(v.view==='project'){ const p=projById(v.id); if(!p){pop();return;} header=detailHead(esc(p.name)); body=vProject(p); fabFor('project', p.id); }
+  else if(v.view==='project'){ const p=projById(v.id); if(!p){pop();return;} header=detailHead(esc(p.name)); body=(viewMode()==='sheets'?vProjectSheets(p):vProject(p)); fabFor('project', p.id); }
   else if(v.view==='task'){ const t=S.tasks.find(x=>x.id===v.id); if(!t){pop();return;} header=detailHead('Task'); body=vTask(t); }
   else if(v.view==='calendar'){ header=barHead('Calendar', true); body=vCalendar(); }
   else if(v.view==='reminders'){ header=barHead('Reminders', true); body=vReminders(); fabFor('reminders'); }
@@ -1080,6 +1120,7 @@ function vProject(p){
     (p.due_date?'<div class="small muted mt8">Due '+esc(fmtDate(p.due_date))+'</div>':'')+
     '</div><button class="iconbtn" data-act="proj-menu" data-id="'+p.id+'" aria-label="Project options">'+I.more+'</button>'+
     '<button class="iconbtn" data-act="proj-edit" data-id="'+p.id+'" aria-label="Edit project">'+I.edit+'</button></div></div>';
+  h += segView('den');
   // filter chips
   const usedKeys = [...new Set(tasks.map(t=>t.status))];
   h += '<div class="chips"><button class="chip'+(S.statusFilter==='all'?' on':'')+'" data-act="chip-status" data-key="all">All ('+tasks.length+')</button>'+
@@ -1105,6 +1146,126 @@ function vProject(p){
   }
   return h;
 }
+/* ---------- DEN v2.5: sheets mode — keyboard-first task grid ---------- */
+function sheetStatusSel(t){
+  return '<select class="scell sstatus" data-id="'+t.id+'" aria-label="Status">'+
+    S.statuses.slice().sort((a,b)=>a.position-b.position).map(s=>
+      '<option value="'+esc(s.key)+'"'+(s.key===t.status?' selected':'')+'>'+esc(s.label)+'</option>').join('')+'</select>';
+}
+function sheetPriSel(t){
+  return '<select class="scell spri" data-id="'+t.id+'" aria-label="Priority">'+
+    ['high','normal','low'].map(x=>'<option value="'+x+'"'+(t.priority===x?' selected':'')+'>'+priLabel(x)+'</option>').join('')+'</select>';
+}
+function sheetPctCell(t){
+  const pct = taskPct(t);
+  return '<div class="spct"><div class="spctbarwrap"><div class="spctbar" style="width:'+pct+'%"></div></div><span>'+pct+'%</span></div>';
+}
+function vProjectSheets(p){
+  const pct = projectPct(p);
+  const tasks = projectTasks(p.id);
+  const doneN = tasks.filter(t=>taskPct(t)===100).length;
+  let h = '<div class="card"><div style="display:flex;gap:16px;align-items:center">'+
+    '<div style="position:relative;width:84px;height:84px;flex:0 0 auto">'+ring(pct,84)+
+    '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:19px">'+pct+'%</div></div>'+
+    '<div style="flex:1;min-width:0">'+
+    (p.description?'<div class="small muted" style="margin-bottom:6px">'+esc(p.description)+'</div>':'')+
+    '<div class="small">'+doneN+' of '+tasks.length+' tasks at 100%</div>'+
+    (p.due_date?'<div class="small muted mt8">Due '+esc(fmtDate(p.due_date))+'</div>':'')+
+    '</div><button class="iconbtn" data-act="proj-menu" data-id="'+p.id+'" aria-label="Project options">'+I.more+'</button>'+
+    '<button class="iconbtn" data-act="proj-edit" data-id="'+p.id+'" aria-label="Edit project">'+I.edit+'</button></div></div>';
+  h += segView('sheets');
+  h += '<div class="sheetwrap"><table class="sheetgrid" id="sheetgrid"><thead><tr>'+
+    '<th style="width:36px">#</th><th>Task</th><th>Status</th><th>%</th><th>Priority</th><th>Due</th><th style="width:78px"></th>'+
+    '</tr></thead><tbody>';
+  tasks.forEach((t,i)=>{
+    h += '<tr class="srow" data-id="'+t.id+'">'+
+      '<td class="snum">'+(i+1)+'</td>'+
+      '<td><input class="scell stitle" data-id="'+t.id+'" value="'+esc(t.title)+'" placeholder="Task name" autocomplete="off" aria-label="Task name"></td>'+
+      '<td>'+sheetStatusSel(t)+'</td>'+
+      '<td>'+sheetPctCell(t)+'</td>'+
+      '<td>'+sheetPriSel(t)+'</td>'+
+      '<td><input class="scell sdate" type="date" data-id="'+t.id+'" value="'+esc(t.due_date||'')+'" aria-label="Due date"></td>'+
+      '<td style="white-space:nowrap"><button class="sopen" data-act="sheet-opentask" data-id="'+t.id+'" title="Open task details" aria-label="Open task details">&#8599;</button>'+
+      '<button class="sdel" data-act="sheet-deltask" data-id="'+t.id+'" title="Delete task" aria-label="Delete task">&times;</button></td></tr>';
+  });
+  h += '<tr class="srow srow-new"><td class="snum">+</td>'+
+    '<td><input class="scell stitle" data-new="1" placeholder="Type a task and hit Enter&hellip;" autocomplete="off" aria-label="New task"></td>'+
+    '<td colspan="5"></td></tr>';
+  h += '</tbody></table></div>';
+  h += '<div class="sheethint">Tab moves across &middot; Enter adds the next task &middot; changes save automatically.</div>';
+  return h;
+}
+function sheetTaskById(id){ return S.tasks.find(x=>x.id===id); }
+function sheetRefreshPct(id){
+  const t = sheetTaskById(id); if(!t) return;
+  const row = document.querySelector('.srow[data-id="'+id+'"]');
+  const cell = row && row.querySelector('td:nth-child(4)');
+  if(cell) cell.innerHTML = sheetPctCell(t);
+}
+async function sheetSaveField(id, field, value){
+  const t = sheetTaskById(id); if(!t || t[field]===value) return;
+  const oldStatus = t.status;
+  const {error} = await db(sb.from('tasks').update({[field]:value}).eq('id',id), 'Could not save task');
+  if(error) return;
+  t[field] = value;
+  sheetRefreshPct(id);
+  if(field==='status' && value==='reminder' && oldStatus!=='reminder' && !t.reminder_id) sheetLinkReminder(id);
+  bridgeSyncAll();
+}
+async function sheetAddTask(pid, title){
+  const maxPos = projectTasks(pid).reduce((m,x)=>Math.max(m,x.position),0);
+  const {data, error} = await db(sb.from('tasks').insert({project_id:pid, user_id:S.user.id, title:title.slice(0,200),
+    detail:'', status:'yet_to_begin', priority:'normal', due_date:null, position:maxPos+1}).select().single(), 'Could not create task');
+  if(error || !data) return;
+  S.tasks.push(data); S.subsByTask[data.id]=[];
+  render();
+  const el = document.querySelector('.srow-new .stitle');
+  if(el) el.focus();
+}
+function wireSheets(pid){
+  const grid = $('sheetgrid'); if(!grid || grid._wired) return; grid._wired = true;
+  const rowsOf = ()=>Array.prototype.slice.call(grid.querySelectorAll('.srow'));
+  const commitTitle = inp=>{
+    const v = inp.value.trim();
+    if(inp.dataset.new){
+      if(!v) return;
+      inp.value='';
+      sheetAddTask(pid, v);
+    } else {
+      const t = sheetTaskById(inp.dataset.id); if(!t) return;
+      if(v && v!==t.title) sheetSaveField(inp.dataset.id, 'title', v);
+      else inp.value = t.title;
+    }
+  };
+  grid.addEventListener('keydown', e=>{
+    const inp = e.target.closest ? e.target.closest('.stitle') : null; if(!inp) return;
+    if(e.key==='Enter'){
+      e.preventDefault();
+      const isNew = !!inp.dataset.new;
+      commitTitle(inp);
+      if(!isNew){
+        const rows = rowsOf(), i = rows.indexOf(inp.closest('.srow')), next = rows[i+1];
+        if(next){ const n = next.querySelector('.stitle'); if(n) setTimeout(()=>n.focus(), 30); }
+      }
+    } else if(e.key==='Escape'){ inp.blur(); }
+    else if(e.key==='ArrowDown' || e.key==='ArrowUp'){
+      const rows = rowsOf(), i = rows.indexOf(inp.closest('.srow'));
+      const j = e.key==='ArrowDown' ? i+1 : i-1;
+      if(j>=0 && j<rows.length){ e.preventDefault(); const n = rows[j].querySelector('.stitle'); if(n){ n.focus(); n.select(); } }
+    }
+  });
+  grid.addEventListener('focusout', e=>{
+    const inp = e.target.closest ? e.target.closest('.stitle') : null; if(!inp) return;
+    commitTitle(inp);
+  });
+  grid.addEventListener('change', e=>{
+    const el = e.target; if(!el.dataset || !el.dataset.id) return;
+    if(el.classList.contains('sstatus')) sheetSaveField(el.dataset.id, 'status', el.value);
+    else if(el.classList.contains('spri')) sheetSaveField(el.dataset.id, 'priority', el.value);
+    else if(el.classList.contains('sdate')) sheetSaveField(el.dataset.id, 'due_date', el.value||null);
+  });
+}
+function wireSheetsCur(){ const v=cur(); if(v.view==='project' && viewMode()==='sheets' && $('sheetgrid')) wireSheets(v.id); }
 /* one-tap status chips shared by the expanded row and the task page */
 function statusChips(t){
   return S.statuses.slice().sort((a,b)=>a.position-b.position).map(s=>
@@ -1788,6 +1949,11 @@ function vReport(){
   }
   return h;
 }
+function vAppearanceOpt(mode,label,sub){
+  return '<div class="card" data-act="viewmode-set" data-mode="'+mode+'" style="cursor:pointer;padding:14px 16px;margin-bottom:10px"><div class="rowline" style="border:none;padding:0">'+
+    '<div style="flex:1"><div style="font-weight:700">'+label+'</div>'+(sub?'<div class="small muted">'+sub+'</div>':'')+'</div>'+
+    (viewMode()===mode?'<span style="color:var(--ok)">'+I.check+'</span>':'')+'</div></div>';
+}
 function vAppearance(){
   const cur = currentTheme();
   const opt = (mode,label,sub)=>'<div class="card" data-act="theme-set" data-mode="'+mode+'" style="cursor:pointer;padding:14px 16px"><div class="rowline" style="border:none;padding:0">'+
@@ -1799,6 +1965,9 @@ function vAppearance(){
   return opt('light','Light','Bright background, dark text')+
     opt('dark','Dark','Easy on the eyes at night')+
     opt('system','System','Follows your phone setting')+
+    '<div class="small muted" style="margin:16px 0 8px">Project view</div>'+
+    vAppearanceOpt('den','Den','Card list &mdash; tap a task to expand it')+
+    vAppearanceOpt('sheets','Sheets','Spreadsheet grid &mdash; keyboard-first, best on desktop')+
     '<div class="small muted" style="margin:16px 0 8px">Mono interface</div>'+
     tgl(monoOn(),'Mono','Pure black & white. Thin type, lighter feel.','mono-toggle')+
     tgl(monoBoldOn(),'Bolder text','Heavier type inside Mono.','mono-bold');
@@ -1814,6 +1983,13 @@ handleAct = function(act, ds){
   else if(act==='report-prev'){ S.reportWeek=(S.reportWeek||0)-1; render(); }
   else if(act==='report-next'){ S.reportWeek=Math.min(0,(S.reportWeek||0)+1); render(); }
   else if(act==='theme-set'){ applyTheme(ds.mode||'system'); render(); toast('Appearance: '+({light:'Light',dark:'Dark',system:'System'}[ds.mode]||ds.mode)); }
+  else if(act==='viewmode-set'){ setViewMode(ds.mode||'den'); render(); toast('Project view: '+(viewMode()==='sheets'?'Sheets':'Den')); }
+  else if(act==='sheet-deltask'){ const t=S.tasks.find(x=>x.id===ds.id); if(!t) return;
+    confirmSheet('Delete task','Delete "'+t.title+'"? Its subtasks go too.','Delete', async ()=>{
+      const {error}=await db(sb.from('tasks').delete().eq('id',t.id),'Could not delete task');
+      if(!error){ S.tasks=S.tasks.filter(x=>x.id!==t.id); delete S.subsByTask[t.id]; bridgeCancel(taskAlarmId(t)); bridgeSyncAll(); render(); toast('Task deleted.'); }
+    }); }
+  else if(act==='sheet-opentask'){ const t=S.tasks.find(x=>x.id===ds.id); if(t) sheetTaskForm(t.id, t.project_id); }
   else if(act==='mono-toggle'){ try{ localStorage.setItem('den_mono', monoOn()?'0':'1'); }catch(e){} applyMono(); render(); toast('Mono '+(monoOn()?'on':'off')); }
   else if(act==='mono-bold'){ try{ localStorage.setItem('den_mono_bold', monoBoldOn()?'0':'1'); }catch(e){} applyMono(); render(); }
   else if(act==='goto-search'){ S.searchQ=''; push({view:'search'}); }
@@ -2107,7 +2283,7 @@ function vAbout(){
     '<img class="aboutlogo" src="brand/kodiak-logo.png" alt="Kodiak">'+
     '<div class="denword" style="font-size:22px">DEN</div>'+
     '<div class="small muted">Kodiak Project Tracker · by Kodiak</div>'+
-    '<div class="tiny muted" style="margin-top:6px">Web &amp; Android · v2.4</div></div>'+
+    '<div class="tiny muted" style="margin-top:6px">Web &amp; Android · v2.5</div></div>'+
     '<a class="btn block" href="https://midhunm08.github.io/Buy-me-a-coffee/" target="_blank" rel="noopener" style="text-decoration:none;margin-bottom:12px">\u2615 Buy me a coffee</a>'+
     '<div class="card"><div class="kv"><span class="small muted">Username</span><span style="font-weight:600">'+esc(S.profile.username||'')+'</span></div>'+
     '<div class="field" style="margin-top:12px"><label>Display name</label><input class="input" id="abName" value="'+esc(S.profile.display_name||'')+'"></div>'+
@@ -2162,6 +2338,50 @@ function currentTheme(){ try{ return localStorage.getItem('den_theme') || 'syste
 /* DEN v2.4: Mono — black & white interface, persisted in localStorage */
 function monoOn(){ try{ return localStorage.getItem('den_mono')==='1'; }catch(e){ return false; } }
 function monoBoldOn(){ try{ return localStorage.getItem('den_mono_bold')==='1'; }catch(e){ return false; } }
+/* DEN v2.5: project view mode — 'den' cards or 'sheets' grid, persisted in localStorage */
+function viewMode(){ try{ return localStorage.getItem('den_viewmode')==='sheets' ? 'sheets' : 'den'; }catch(e){ return 'den'; } }
+function setViewMode(m){ try{ localStorage.setItem('den_viewmode', m==='sheets'?'sheets':'den'); }catch(e){} }
+function segView(cur){
+  return '<div style="margin:2px 0 12px"><div class="segview" role="tablist" aria-label="Project view">'+
+    '<button data-act="viewmode-set" data-mode="den" class="'+(cur==='den'?' on':'')+'">Den</button>'+
+    '<button data-act="viewmode-set" data-mode="sheets" class="'+(cur==='sheets'?' on':'')+'">Sheets</button></div></div>';
+}
+/* DEN v2.5: first-run setup — view mode + appearance, shown once after signup */
+function setupDone(){ try{ return localStorage.getItem('den_setup_done')==='1'; }catch(e){ return true; } }
+const SETUP = {view:'den', theme:'system', mono:false};
+function showSetup(){
+  SETUP.view='den'; SETUP.theme=currentTheme(); SETUP.mono=monoOn();
+  $('tabbar').style.display='none'; $('fab').style.display='none'; $('appwrap').classList.remove('in');
+  const pick=(grp,val,t,d)=>'<button class="pick'+(SETUP[grp]===val?' on':'')+'" data-sg="'+grp+'" data-sv="'+val+'"><div class="t">'+t+'</div><div class="d">'+d+'</div></button>';
+  const themePick=v=>'<button class="pick'+(SETUP.theme===v?' on':'')+'" data-sg="theme" data-sv="'+v+'"><div class="t">'+({light:'Light',dark:'Dark',system:'System'}[v])+'</div><div class="d">'+({light:'Bright background',dark:'Easy on the eyes',system:'Follows your phone'}[v])+'</div></button>';
+  $('app').innerHTML='<div class="setupwrap">'+
+    '<div style="text-align:center;margin-bottom:18px"><div class="logo denword" style="font-size:34px">DEN</div>'+
+    '<div class="sub">KODIAK PROJECT TRACKER</div><h2 style="margin:10px 0 4px">How do you want to work?</h2>'+
+    '<div class="small muted">You can change all of this later in More &rarr; Appearance.</div></div>'+
+    '<div class="setupcard"><h3>Project view</h3><p class="sub">How tasks look inside a project.</p>'+
+    '<div class="pickgrid">'+pick('view','den','Den','Card list &mdash; tap a task to expand it.')+pick('view','sheets','Sheets','Spreadsheet grid &mdash; type, Tab, Enter. Best on desktop.')+'</div></div>'+
+    '<div class="setupcard"><h3>Appearance</h3><p class="sub">Light, dark, or follow your device.</p>'+
+    '<div class="pickgrid trio">'+themePick('light')+themePick('dark')+themePick('system')+'</div></div>'+
+    '<div class="setupcard"><h3>Mono interface</h3><p class="sub">Pure black &amp; white. Thin type, lighter feel.</p>'+
+    '<div class="pickgrid"><button class="pick'+(SETUP.mono?' on':'')+'" data-sg="mono" data-sv="1"><div class="t">On</div><div class="d">Black &amp; white</div></button>'+
+    '<button class="pick'+(!SETUP.mono?' on':'')+'" data-sg="mono" data-sv="0"><div class="t">Off</div><div class="d">Full colour</div></button></div></div>'+
+    '<button class="btn primary block" id="setupGo" style="margin-top:6px">Start using Den</button></div>';
+  $('app').querySelectorAll('[data-sg]').forEach(b=>b.onclick=()=>{
+    const g=b.dataset.sg, v=b.dataset.sv;
+    if(g==='mono') SETUP.mono=(v==='1'); else SETUP[g]=v;
+    Array.prototype.forEach.call(b.parentElement.querySelectorAll('.pick'), x=>x.classList.toggle('on', x===b));
+    if(g==='theme') applyTheme(v);
+  });
+  $('setupGo').onclick=()=>{
+    setViewMode(SETUP.view);
+    applyTheme(SETUP.theme);
+    try{ localStorage.setItem('den_mono', SETUP.mono?'1':'0'); localStorage.setItem('den_setup_done','1'); }catch(e){}
+    applyMono();
+    renderTabs(); setTab('today');
+    toast('Welcome to Den!');
+  };
+  window.scrollTo(0,0);
+}
 function applyMono(){
   document.body.classList.toggle('mono', monoOn());
   document.body.classList.toggle('mono-b', monoOn() && monoBoldOn());
@@ -2179,7 +2399,7 @@ function applyTheme(mode){
   if(window.matchMedia){ try{ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', ()=>{ if(currentTheme()==='system') applyTheme('system'); }); }catch(e){} }
   // patch render to wire dynamic inputs
   const _render = render;
-  render = function(){ _render(); wireDynamic(); };
+  render = function(){ _render(); wireDynamic(); wireSheetsCur(); };
   sb.auth.onAuthStateChange((ev)=>{ if(ev==='SIGNED_OUT'){ S.user=null; S.dataReady=false; renderAuth('login'); } });
   boot();
 })();
