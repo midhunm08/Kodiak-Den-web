@@ -118,12 +118,17 @@ td.stcell select.cin{padding-left:26px}
   padding:48px 20px;text-align:center;color:var(--muted);font-size:14px;
 }
 
-/* ---------- tab bar ---------- */
+/* ---------- tab bar (v2: horizontal scroll, never wraps) ---------- */
+#tabwrap{
+  flex:0 0 auto;min-height:38px;background:var(--tabbg);border-top:1px solid var(--grid);
+  display:flex;align-items:flex-end;user-select:none;
+}
 #tabbar{
-  flex:0 0 auto;height:38px;background:var(--tabbg);border-top:1px solid var(--grid);
-  display:flex;align-items:flex-end;gap:2px;padding:0 10px;user-select:none;overflow-x:auto;
+  flex:1;min-width:0;height:38px;
+  display:flex;align-items:flex-end;gap:2px;padding:0 10px;flex-wrap:nowrap;overflow-x:auto;
 }
 .ptab{
+  flex:0 0 auto;
   padding:7px 16px;font-size:13px;color:var(--tabink);cursor:pointer;white-space:nowrap;
   border:1px solid var(--grid);border-bottom:0;border-radius:7px 7px 0 0;
   background:transparent;margin-top:4px;
@@ -133,7 +138,30 @@ td.stcell select.cin{padding-left:26px}
 .ptab.on{background:var(--tabactive);color:var(--ink);font-weight:700;border-bottom:1px solid var(--tabactive);margin-bottom:-1px}
 .ptab.on{box-shadow:inset 0 3px 0 var(--gold)}
 .ptab.add{font-weight:700;font-size:15px;padding:5px 12px}
-#taskcount{margin-left:auto;font-size:12px;color:var(--muted);padding:8px 4px;white-space:nowrap;align-self:center}
+.ptab.sumtab{background:rgba(212,160,23,.10);font-weight:600}
+.ptab.sumtab.on{background:var(--tabactive)}
+#btnHidden{
+  flex:0 0 auto;align-self:center;margin:0 0 0 8px;
+  background:transparent;border:1px dashed var(--grid);color:var(--muted);
+  border-radius:7px;padding:6px 10px;font-size:12px;white-space:nowrap;
+}
+#btnHidden:hover{color:var(--ink);border-color:var(--gold)}
+#taskcount{flex:0 0 auto;font-size:12px;color:var(--muted);padding:8px 10px 8px 4px;white-space:nowrap;align-self:center}
+
+/* ---------- v2: summary + settings ---------- */
+#grid td.sumcell{padding:6px 10px;font-size:14px;background:var(--sheet)}
+.sumjump{background:none;border:0;color:var(--ink);font:inherit;font-weight:600;text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:0;text-align:left}
+.sumjump:hover{color:var(--gold)}
+#modal.wide{width:540px}
+.strow{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.strow input[type=color]{width:40px;height:36px;border:1px solid var(--grid);border-radius:8px;background:var(--fxbg);padding:2px;cursor:pointer;flex:0 0 auto}
+.strow input[type=text]{flex:1;min-width:0;padding:9px 10px;font:inherit;font-size:14px;color:var(--ink);background:var(--fxbg);border:1px solid var(--grid);border-radius:8px;outline:none}
+.strow input[type=text]:focus,.strow input[type=number]:focus{border-color:var(--gold)}
+.strow input[type=number]{width:74px;flex:0 0 auto;padding:9px 6px;font:inherit;font-size:14px;color:var(--ink);background:var(--fxbg);border:1px solid var(--grid);border-radius:8px;outline:none}
+.stx{background:transparent;border:0;color:var(--muted);font-size:16px;padding:8px;border-radius:6px;flex:0 0 auto}
+.stx:hover{color:var(--danger);background:var(--selrow)}
+.hrow{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.hrow .hn{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* ---------- context menu / modal / toast ---------- */
 #ctxmenu{
@@ -250,6 +278,7 @@ td.stcell select.cin{padding-left:26px}
   <div id="topbar">
     <div id="wordmark">DEN <span class="gold">SHEETS</span></div>
     <div id="tbproj"></div>
+    <button class="tbtn" id="btnStatuses" title="Manage statuses">&#9881; Statuses</button>
     <button class="tbtn" id="btnTheme" title="Toggle light / dark">Dark</button>
     <button class="tbtn" id="btnAbout">About</button>
     <button class="tbtn" id="btnLogout">Log out</button>
@@ -263,11 +292,15 @@ td.stcell select.cin{padding-left:26px}
     <table id="grid" aria-label="Task grid"></table>
     <div id="gridempty" style="display:none">No projects yet.<br>Hit the <b>+</b> tab below to create your first project.</div>
   </div>
-  <div class="hintline">Click a cell to edit &middot; Enter commits and moves down &middot; Tab moves right &middot; Arrows move between cells &middot; Click a row number, then Delete, to remove a task</div>
-  <div id="tabbar"></div>
+  <div class="hintline">Click a cell to edit &middot; Enter commits and moves down &middot; Tab moves right &middot; Arrows move between cells &middot; Click a row number, then Delete, to remove a task &middot; Right-click a project tab for rename / hide / delete</div>
+  <div id="tabwrap">
+    <button id="btnHidden" style="display:none" title="Show hidden projects"></button>
+    <div id="tabbar"></div>
+    <span id="taskcount"></span>
+  </div>
 </div>
 
-<div id="ctxmenu"><button class="danger" id="ctxDelete">Delete task</button></div>
+<div id="ctxmenu"></div>
 
 <div id="modalback"><div id="modal"></div></div>
 <div id="toast"></div>
@@ -275,7 +308,7 @@ td.stcell select.cin{padding-left:26px}
 <script>
 'use strict';
 /* ================================================================
-   DEN SHEETS v1 — spreadsheet project tracker.
+   DEN SHEETS v2 — spreadsheet project tracker.
    Shares Den's Supabase backend: same login, same data, same %.
    ================================================================ */
 
@@ -309,6 +342,7 @@ const S = {
   statuses:[], projects:[], tasks:[],
   subsByTask:{},
   pid:null,            // active project id
+  sumView:true,        // summary sheet selected (not a project)
   sel:null,            // {r, c} selected cell; r == tasks.length -> new row
   rowSel:null,         // gutter-selected row index
   theme:'light'
@@ -318,7 +352,7 @@ try{ S.theme = localStorage.getItem('ds_theme') || 'light'; }catch(e){}
 function statusByKey(k){ return S.statuses.find(s=>s.key===k); }
 function projectTasks(pid){ return S.tasks.filter(t=>t.project_id===pid).sort((a,b)=>a.position-b.position); }
 function sortedProjects(){
-  return S.projects.slice().sort((a,b)=> (b.pinned-a.pinned) || ((a.sort_order||0)-(b.sort_order||0)) || (new Date(a.created_at)-new Date(b.created_at)));
+  return S.projects.filter(p=>!p.archived).slice().sort((a,b)=> (b.pinned-a.pinned) || ((a.sort_order||0)-(b.sort_order||0)) || (new Date(a.created_at)-new Date(b.created_at)));
 }
 function taskById(id){ return S.tasks.find(t=>t.id===id); }
 function reindexSubs(subs){
@@ -436,6 +470,7 @@ async function boot(){
   applyTheme();
   const sorted = sortedProjects();
   S.pid = sorted.length ? sorted[0].id : null;
+  S.sumView = true; // boot into the Summary sheet
   S.sel = null; S.rowSel = null;
   renderAll();
 }
@@ -479,7 +514,7 @@ async function createProject(name){
   }).select().single(), 'Could not create project');
   if(error || !data) return;
   S.projects.push(data);
-  S.pid = data.id; S.sel = null; S.rowSel = null;
+  S.pid = data.id; S.sumView = false; S.sel = null; S.rowSel = null;
   closeModal(); renderAll();
   toast('Project created.');
 }
@@ -521,6 +556,7 @@ function newRowHTML(n){
   '</tr>';
 }
 function renderGrid(){
+  if(S.sumView){ renderSummaryGrid(); return; }
   const grid = $('grid');
   const tasks = S.pid ? projectTasks(S.pid) : [];
   const has = !!S.pid;
@@ -555,6 +591,7 @@ function refreshStatusDot(id){
    SELECTION + FORMULA BAR
    ================================================================ */
 function rawVal(r, c){
+  if(S.sumView){ const td = cellEl(r, c); return td ? td.textContent.trim() : ''; }
   const tasks = projectTasks(S.pid);
   if(r >= tasks.length){ // new row
     const td = cellEl(r,c), inp = td && td.querySelector('input');
@@ -568,7 +605,7 @@ function rawVal(r, c){
   if(col.key==='#') return String(r+1);
   return taskPct(t)+'%';
 }
-function cellRef(r,c){ return COLS[c].letter + (r+1); }
+function cellRef(r,c){ return (S.sumView ? SUMCOLS[c] : COLS[c].letter) + (r+1); }
 function syncFormula(){
   if(!S.sel){ $('namebox').textContent = '—'; $('fxinput').value = ''; return; }
   $('namebox').textContent = cellRef(S.sel.r, S.sel.c);
@@ -589,9 +626,14 @@ function paintSel(){
   }
 }
 let lastFocusCell = null;
+/* selection bounds: summary has no new row and 4 columns */
+function gridMaxRC(){
+  const n = S.sumView ? sortedProjects().length : projectTasks(S.pid).length;
+  return { maxR: S.sumView ? Math.max(n-1, 0) : n, maxC: S.sumView ? 4 : 6 };
+}
 function setSel(r, c, focus){
-  const n = projectTasks(S.pid).length;
-  r = Math.max(0, Math.min(n, r)); c = Math.max(0, Math.min(6, c));
+  const {maxR, maxC} = gridMaxRC();
+  r = Math.max(0, Math.min(maxR, r)); c = Math.max(0, Math.min(maxC, c));
   const moved = !S.sel || S.sel.r!==r || S.sel.c!==c;
   S.sel = {r, c};
   paintSel(); syncFormula();
@@ -609,9 +651,9 @@ function setSel(r, c, focus){
 }
 function moveSel(dr, dc){
   if(!S.sel) return;
-  const n = projectTasks(S.pid).length;
+  const {maxR, maxC} = gridMaxRC();
   let r = S.sel.r + dr, c = S.sel.c + dc;
-  if(r<0||r>n||c<0||c>6) return;
+  if(r<0||r>maxR||c<0||c>maxC) return;
   commitIfDirty();
   setSel(r, c);
 }
@@ -656,6 +698,7 @@ function commitCell(r, c){
   }
 }
 function fxCommit(){
+  if(S.sumView){ toast('Summary is read-only.'); syncFormula(); return; }
   if(!S.sel || !S.pid) return;
   const {r, c} = S.sel, col = COLS[c];
   const v = $('fxinput').value;
@@ -707,8 +750,11 @@ function wireGrid(){
   const grid = $('grid');
   grid.addEventListener('click', e=>{
     hideCtx();
+    const jmp = e.target.closest('.sumjump');
+    if(jmp){ jumpToProject(jmp.dataset.pid); return; }
     const td = e.target.closest('td[data-r]'); if(!td) return;
     const r = +td.dataset.r, c = +td.dataset.c;
+    if(S.sumView){ S.rowSel = null; setSel(r, c, false); const cell = cellEl(r, c); if(cell) cell.focus(); return; }
     if(c === 0){ selectRow(r); return; }
     S.rowSel = null;
     setSel(r, c);
@@ -735,6 +781,19 @@ function wireGrid(){
     const k = e.key;
     const ctl = e.target.closest ? e.target.closest('input,select') : null;
     const isText = ctl && ctl.tagName==='INPUT' && ctl.type==='text';
+    if(S.sumView){
+      if(k==='Enter'||k==='Tab'||k==='Delete'||k==='Backspace'){ e.preventDefault(); toast('Summary is read-only.'); }
+      else if(k==='Escape'){ td.blur(); }
+      else if(k.indexOf('Arrow')===0 && !e.altKey && !e.ctrlKey && !e.metaKey){
+        e.preventDefault();
+        S.sel = {r, c}; // keep selection in sync with keyboard focus
+        if(k==='ArrowUp') moveSel(-1,0);
+        else if(k==='ArrowDown') moveSel(1,0);
+        else if(k==='ArrowLeft') moveSel(0,-1);
+        else moveSel(0,1);
+      }
+      return;
+    }
     S.sel = {r, c}; // keep selection in sync with keyboard focus
 
     if(k==='Enter'){
@@ -783,19 +842,20 @@ function wireGrid(){
     }
   });
   grid.addEventListener('contextmenu', e=>{
+    if(S.sumView) return;
     const td = e.target.closest('td[data-r]'); if(!td) return;
     const r = +td.dataset.r, c = +td.dataset.c;
     if(c!==0) return;
     if(r >= projectTasks(S.pid).length) return;
     e.preventDefault();
     selectRow(r);
-    showCtx(e.clientX, e.clientY, r);
+    showCtx(e.clientX, e.clientY, [{label:'Delete task', danger:true, fn:function(){ askDelete(r); }}]);
   });
 }
 /* move without committing (commit already handled by caller) */
 function moveSelSilent(r, c){
-  const n = projectTasks(S.pid).length;
-  if(r<0||r>n||c<0||c>6) return;
+  const {maxR, maxC} = gridMaxRC();
+  if(r<0||r>maxR||c<0||c>maxC) return;
   setSel(r, c);
 }
 
@@ -815,52 +875,267 @@ function askDelete(r){
   $('mGo').onclick = async ()=>{ closeModal(); await deleteTask(delId); };
 }
 
+/* ---------- project tab context menu: rename / archive / delete ---------- */
+function openProjectCtx(x, y, pid){
+  const p = S.projects.find(z=>z.id===pid); if(!p) return;
+  showCtx(x, y, [
+    {label:'Rename', fn:function(){ openRenameModal(pid); }},
+    {label:'Archive (hide)', fn:function(){ askArchive(pid); }},
+    {label:'Delete', danger:true, fn:function(){ askDeleteProject(pid); }}
+  ]);
+}
+function openRenameModal(pid){
+  const p = S.projects.find(z=>z.id===pid); if(!p) return;
+  openModal('Rename project',
+    '<div class="fld"><label>Project name</label><input id="mpName" value="'+esc(p.name)+'" autocomplete="off"></div>'+
+    '<div class="mrow"><button class="mbtn" id="mCancel">Cancel</button>'+
+    '<button class="mbtn primary" id="mGo">Save</button></div>');
+  $('mCancel').onclick = closeModal;
+  const go = async ()=>{
+    const v = $('mpName').value.trim();
+    if(!v){ toast('Give the project a name.', true); return; }
+    const {error} = await db(sb.from('projects').update({name:v.slice(0,120)}).eq('id',pid), 'Could not rename project');
+    if(!error){ p.name = v.slice(0,120); closeModal(); renderTabs(); renderTopbar(); toast('Renamed.'); }
+  };
+  $('mGo').onclick = go;
+  $('mpName').addEventListener('keydown', e=>{ if(e.key==='Enter') go(); });
+  setTimeout(()=>{ const i=$('mpName'); if(i){ i.focus(); try{ i.select(); }catch(e){} } }, 60);
+}
+function askArchive(pid){
+  const p = S.projects.find(z=>z.id===pid); if(!p) return;
+  openModal('Hide project',
+    '<p>Hide <b>'+esc(p.name)+'</b>? You can unhide it later.</p>'+
+    '<div class="mrow"><button class="mbtn" id="mCancel">Cancel</button>'+
+    '<button class="mbtn primary" id="mGo">Hide</button></div>');
+  $('mCancel').onclick = closeModal;
+  $('mGo').onclick = async ()=>{
+    const {error} = await db(sb.from('projects').update({archived:true}).eq('id',pid), 'Could not hide project');
+    if(error) return;
+    p.archived = true;
+    closeModal();
+    if(!S.sumView && S.pid===pid){ S.sumView = true; S.pid = null; S.sel = null; S.rowSel = null; }
+    renderAll(); toast('Project hidden.');
+  };
+}
+async function askDeleteProject(pid){
+  const p = S.projects.find(z=>z.id===pid); if(!p) return;
+  const n = projectTasks(pid).length;
+  openModal('Delete project',
+    '<p>Delete <b>'+esc(p.name)+'</b> and all its '+n+' task'+(n===1?'':'s')+'? This cannot be undone.</p>'+
+    '<div class="mrow"><button class="mbtn" id="mCancel">Cancel</button>'+
+    '<button class="mbtn dangerb" id="mGo">Delete</button></div>');
+  $('mCancel').onclick = closeModal;
+  $('mGo').onclick = async ()=>{
+    closeModal(); toast('Deleting…');
+    const tids = S.tasks.filter(t=>t.project_id===pid).map(t=>t.id);
+    if(tids.length){
+      const r1 = await db(sb.from('subtasks').delete().in('task_id', tids), 'Could not delete subtasks');
+      if(r1.error) return;
+      const r2 = await db(sb.from('tasks').delete().eq('project_id', pid), 'Could not delete tasks');
+      if(r2.error) return;
+    }
+    const r3 = await db(sb.from('projects').delete().eq('id', pid), 'Could not delete project');
+    if(r3.error) return;
+    S.projects = S.projects.filter(z=>z.id!==pid);
+    S.tasks = S.tasks.filter(t=>t.project_id!==pid);
+    tids.forEach(tid=>{ delete S.subsByTask[tid]; });
+    S.sumView = true; S.pid = null; S.sel = null; S.rowSel = null;
+    renderAll(); toast('Project deleted.');
+  };
+}
+
+/* ---------- unhide ---------- */
+function openHiddenModal(){
+  const hid = S.projects.filter(p=>p.archived);
+  let rows = hid.map(p=>
+    '<div class="hrow"><span class="hn">'+esc(p.name)+'</span><button class="mbtn" data-unhide="'+p.id+'">Unhide</button></div>'
+  ).join('');
+  if(!rows) rows = '<p>No hidden projects.</p>';
+  openModal('Hidden projects', rows+'<div class="mrow"><button class="mbtn primary" id="mGo">Close</button></div>');
+  $('mGo').onclick = closeModal;
+  $('modal').querySelectorAll('[data-unhide]').forEach(b=>{
+    b.onclick = async ()=>{
+      const pid = b.dataset.unhide;
+      const p = S.projects.find(z=>z.id===pid); if(!p) return;
+      const {error} = await db(sb.from('projects').update({archived:false}).eq('id',pid), 'Could not unhide project');
+      if(error) return;
+      p.archived = false;
+      openHiddenModal(); // refresh the list
+      renderTabs();
+      toast('Project unhidden.');
+    };
+  });
+}
+
+/* ---------- status settings ---------- */
+function slugDash(label){ return label.toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'') || 'status'; }
+function validColor(c){ return /^#[0-9a-fA-F]{6}$/.test(c||'') ? c : '#888888'; }
+function openStatusSettings(){
+  const list = S.statuses.slice().sort((a,b)=>a.position-b.position);
+  const rows = list.map(s=>
+    '<div class="strow" data-id="'+s.id+'">'+
+    '<input type="color" class="stc" value="'+esc(validColor(s.color))+'" title="Color" aria-label="Status color">'+
+    '<input type="text" class="stl" value="'+esc(s.label)+'" aria-label="Status label" autocomplete="off" spellcheck="false">'+
+    '<input type="number" class="stw" min="0" max="100" value="'+(+s.weight||0)+'" aria-label="Weight percent" title="What this status counts as (%)">'+
+    '<button class="stx" title="Delete status" aria-label="Delete status">&#10005;</button>'+
+    '</div>').join('');
+  openModal('Statuses',
+    '<p>Statuses drive each task\'s %. Changes save automatically.</p>'+
+    '<div id="stlist">'+rows+'</div>'+
+    '<div class="strow"><input type="text" id="stNewLabel" placeholder="New status label&hellip;" autocomplete="off" spellcheck="false" style="flex:1;min-width:0;padding:9px 10px;font:inherit;font-size:14px;color:var(--ink);background:var(--fxbg);border:1px solid var(--grid);border-radius:8px;outline:none">'+
+    '<button class="mbtn primary" id="stAdd" style="flex:0 0 auto">&#65291; Add status</button></div>'+
+    '<div class="mrow"><button class="mbtn primary" id="mGo">Done</button></div>');
+  $('modal').classList.add('wide');
+  $('mGo').onclick = closeModal;
+  $('stlist').addEventListener('change', async e=>{
+    const row = e.target.closest('.strow'); if(!row) return;
+    const s = S.statuses.find(z=>String(z.id)===String(row.dataset.id)); if(!s) return;
+    const label = row.querySelector('.stl').value.trim();
+    if(!label){ toast('Label can\'t be empty.', true); row.querySelector('.stl').value = s.label; return; }
+    const weight = Math.max(0, Math.min(100, parseInt(row.querySelector('.stw').value||'0',10)));
+    row.querySelector('.stw').value = weight;
+    const color = row.querySelector('.stc').value;
+    const {error} = await db(sb.from('statuses').update({label, weight, color}).eq('id', s.id), 'Could not save status');
+    if(!error){ Object.assign(s, {label, weight, color}); renderGrid(); renderTopbar(); }
+  });
+  $('stlist').addEventListener('click', e=>{
+    const x = e.target.closest('.stx'); if(!x) return;
+    askDeleteStatus(x.closest('.strow').dataset.id);
+  });
+  const addGo = async ()=>{
+    const label = $('stNewLabel').value.trim();
+    if(!label){ toast('Give the status a label.', true); return; }
+    let key = slugDash(label), n2 = 2;
+    while(S.statuses.some(x=>x.key===key)) key = slugDash(label)+'-'+(n2++);
+    const maxPos = S.statuses.reduce((m,x)=>Math.max(m,x.position||0),0);
+    const {data, error} = await db(sb.from('statuses').insert({user_id:S.user.id, key, label, weight:0, color:'#d4a017', position:maxPos+1}).select().single(), 'Could not create status');
+    if(error || !data) return;
+    S.statuses.push(data);
+    openStatusSettings(); renderGrid(); renderTopbar();
+    toast('Status added.');
+  };
+  $('stAdd').onclick = addGo;
+  $('stNewLabel').addEventListener('keydown', e=>{ if(e.key==='Enter') addGo(); });
+  setTimeout(()=>{ const i=$('stNewLabel'); if(i) i.focus(); }, 60);
+}
+function askDeleteStatus(id){
+  const s = S.statuses.find(z=>String(z.id)===String(id)); if(!s) return;
+  if(S.statuses.length <= 1){ toast('You need at least one status.', true); return; }
+  const affected = S.tasks.filter(t=>t.status===s.key).length;
+  openModal('Delete status',
+    '<p>Delete <b>'+esc(s.label)+'</b>?'+(affected ? ' '+affected+' task(s) use it — they keep working and show the raw status key.' : '')+'</p>'+
+    '<div class="mrow"><button class="mbtn" id="mCancel">Cancel</button>'+
+    '<button class="mbtn dangerb" id="mGo">Delete</button></div>');
+  $('mCancel').onclick = ()=>{ closeModal(); openStatusSettings(); };
+  $('mGo').onclick = async ()=>{
+    const {error} = await db(sb.from('statuses').delete().eq('id', s.id), 'Could not delete status');
+    if(error) return;
+    S.statuses = S.statuses.filter(z=>z!==s);
+    closeModal(); openStatusSettings(); renderGrid(); renderTopbar();
+    toast('Status deleted.');
+  };
+}
+
 /* ---------- context menu ---------- */
-let ctxRow = null;
-function showCtx(x, y, r){
-  ctxRow = r;
+function showCtx(x, y, items){
   const m = $('ctxmenu');
+  m.innerHTML = items.map((it,i)=>'<button data-i="'+i+'"'+(it.danger?' class="danger"':'')+'>'+esc(it.label)+'</button>').join('');
   m.style.display = 'block';
   m.style.left = Math.min(x, window.innerWidth-170)+'px';
-  m.style.top = Math.min(y, window.innerHeight-60)+'px';
+  m.style.top = Math.min(y, window.innerHeight-80)+'px';
+  m.querySelectorAll('button').forEach(b=>{
+    b.onclick = ()=>{ hideCtx(); items[+b.dataset.i].fn(); };
+  });
 }
-function hideCtx(){ $('ctxmenu').style.display = 'none'; ctxRow = null; }
+function hideCtx(){ $('ctxmenu').style.display = 'none'; }
 
 /* ================================================================
    TOPBAR / TABS / MODALS
    ================================================================ */
 function renderTopbar(){
+  if(S.sumView){ $('tbproj').textContent = 'Summary'; return; }
   const p = S.projects.find(x=>x.id===S.pid);
   $('tbproj').textContent = p ? p.name+'  ·  '+projectPct(p)+'%' : '';
 }
 function renderTabs(){
   const bar = $('tabbar');
   const sorted = sortedProjects();
-  let h = sorted.map(p=>'<button class="ptab'+(p.id===S.pid?' on':'')+'" data-pid="'+p.id+'" title="'+esc(p.name)+'">'+esc(p.name)+'</button>').join('');
+  let h = '<button class="ptab sumtab'+(S.sumView?' on':'')+'" data-sum="1" title="Overview of all projects">\u03A3 Summary</button>';
+  h += sorted.map(p=>'<button class="ptab'+((!S.sumView&&p.id===S.pid)?' on':'')+'" data-pid="'+p.id+'" title="'+esc(p.name)+'">'+esc(p.name)+'</button>').join('');
   h += '<button class="ptab add" id="tabAdd" title="New project">+</button>';
-  const n = S.pid ? projectTasks(S.pid).length : 0;
-  h += '<span id="taskcount">'+n+' task'+(n===1?'':'s')+'</span>';
   bar.innerHTML = h;
+  const hidden = S.projects.filter(p=>p.archived).length;
+  const bh = $('btnHidden');
+  bh.style.display = hidden ? '' : 'none';
+  bh.textContent = 'Hidden ('+hidden+')';
+  const n = S.sumView ? sorted.length : (S.pid ? projectTasks(S.pid).length : 0);
+  $('taskcount').textContent = S.sumView ? n+' project'+(n===1?'':'s') : n+' task'+(n===1?'':'s');
 }
 function wireTabs(){
   $('tabbar').addEventListener('click', e=>{
     const add = e.target.closest('#tabAdd');
     if(add){ openProjectModal(); return; }
+    const sum = e.target.closest('[data-sum]');
+    if(sum){
+      if(S.sumView) return;
+      commitIfDirty();
+      S.sumView = true; S.sel = null; S.rowSel = null;
+      renderAll();
+      return;
+    }
     const t = e.target.closest('.ptab[data-pid]'); if(!t) return;
-    if(t.dataset.pid === S.pid) return;
+    if(!S.sumView && t.dataset.pid === S.pid) return;
     commitIfDirty();
-    S.pid = t.dataset.pid; S.sel = null; S.rowSel = null;
+    S.sumView = false; S.pid = t.dataset.pid; S.sel = null; S.rowSel = null;
     renderTopbar(); renderTabs(); renderGrid();
   });
+  $('tabbar').addEventListener('contextmenu', e=>{
+    const t = e.target.closest('.ptab[data-pid]'); if(!t) return;
+    e.preventDefault();
+    openProjectCtx(e.clientX, e.clientY, t.dataset.pid);
+  });
+  $('btnHidden').onclick = openHiddenModal;
 }
 function renderAll(){ renderTopbar(); renderTabs(); renderGrid(); }
+
+/* ---------- summary sheet (read-only overview, not a project) ---------- */
+const SUMCOLS = ['', 'A', 'B', 'C', 'D'];
+function jumpToProject(pid){
+  commitIfDirty();
+  S.sumView = false; S.pid = pid; S.sel = null; S.rowSel = null;
+  renderAll();
+}
+function renderSummaryGrid(){
+  const grid = $('grid');
+  const projs = sortedProjects();
+  $('gridempty').style.display = projs.length ? 'none' : 'block';
+  grid.style.display = '';
+  const cols = [['A','Project'],['B','Tasks'],['C','Done'],['D','%']];
+  let h = '<colgroup><col style="width:46px"><col><col style="width:110px"><col style="width:110px"><col style="width:150px"></colgroup><thead><tr><th></th>'+
+    cols.map((x,i)=>'<th data-c="'+(i+1)+'"><span class="hl">'+x[0]+'</span><span class="hn">'+x[1]+'</span></th>').join('')+'</tr></thead><tbody>';
+  projs.forEach((p,i)=>{
+    const ts = projectTasks(p.id);
+    const done = ts.filter(t=>taskPct(t)===100).length;
+    const pc = projectPct(p);
+    h += '<tr>'+
+      '<td class="gnum" data-r="'+i+'" data-c="0" tabindex="-1">'+(i+1)+'</td>'+
+      '<td class="sumcell" data-r="'+i+'" data-c="1" tabindex="-1"><button class="sumjump" data-pid="'+p.id+'">'+esc(p.name)+'</button></td>'+
+      '<td class="sumcell" data-r="'+i+'" data-c="2" tabindex="-1">'+ts.length+'</td>'+
+      '<td class="sumcell" data-r="'+i+'" data-c="3" tabindex="-1">'+done+'</td>'+
+      '<td class="sumcell" data-r="'+i+'" data-c="4" tabindex="-1"><div class="pwrap"><span class="pbar"><i style="width:'+pc+'%"></i></span><span class="pnum">'+pc+'%</span></div></td>'+
+    '</tr>';
+  });
+  h += '</tbody>';
+  grid.innerHTML = h;
+  if(S.sel && S.sel.r < projs.length) paintSel(); else { S.sel = null; syncFormula(); }
+}
 
 /* ---------- modal ---------- */
 function openModal(title, html){
   $('modal').innerHTML = '<h3>'+esc(title)+'</h3>'+html;
   $('modalback').classList.add('open');
 }
-function closeModal(){ $('modalback').classList.remove('open'); }
+function closeModal(){ $('modalback').classList.remove('open'); $('modal').classList.remove('wide'); }
 function openProjectModal(){
   openModal('New project',
     '<div class="fld"><label>Project name</label><input id="mpName" placeholder="e.g. Website redesign" autocomplete="off"></div>'+
@@ -874,7 +1149,7 @@ function openProjectModal(){
 }
 function openAbout(){
   openModal('About',
-    '<h3 style="margin-bottom:2px">Den Sheets <span style="color:var(--gold)">v1</span></h3>'+
+    '<h3 style="margin-bottom:2px">Den Sheets <span style="color:var(--gold)">v2</span></h3>'+
     '<p>Same Den workspace — one login, same projects, same live data, in a spreadsheet.<br><br>Backend: Supabase (auth + Postgres). Fully free.</p>'+
     '<div class="mrow"><button class="mbtn primary" id="mGo">Close</button></div>');
   $('mGo').onclick = closeModal;
@@ -929,11 +1204,11 @@ function wireStatic(){
   [$('liUser'), $('liPass')].forEach(el=>el.addEventListener('keydown', e=>{ if(e.key==='Enter') doAuth(); }));
   $('btnLogout').onclick = signOut;
   $('btnAbout').onclick = openAbout;
+  $('btnStatuses').onclick = openStatusSettings;
   $('btnTheme').onclick = toggleTheme;
   $('modalback').addEventListener('click', e=>{ if(e.target===$('modalback')) closeModal(); });
   document.addEventListener('click', e=>{ if(!e.target.closest('#ctxmenu')) hideCtx(); });
   document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ hideCtx(); closeModal(); } });
-  $('ctxDelete').onclick = ()=>{ if(ctxRow!==null){ const r = ctxRow; hideCtx(); askDelete(r); } };
   wireGrid(); wireTabs(); wireFx();
   applyTheme();
 }
